@@ -16,28 +16,34 @@ services:
       - n8n-network
 
   n8n:
-    image: n8nio/n8n:latest
-    restart: unless-stopped
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: always
     depends_on:
       db:
         condition: service_healthy
     env_file:
       - .env
     environment:
+      N8N_RUNNERS_DISABLED: true
       N8N_HOST: vmi2734167.contaboserver.net
       N8N_PORT: "5678"
       N8N_PROTOCOL: https
       N8N_EDITOR_BASE_URL: https://vmi2734167.contaboserver.net:5679
       WEBHOOK_URL: https://vmi2734167.contaboserver.net:5679/
-      N8N_RUNNERS_ENABLED: "true"
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
       NODE_EXTRA_CA_CERTS: /certs/prod-ca-2021.crt
       N8N_PROTOCOL_HEADERS: "true"
       N8N_TRUSTED_PROXIES: "loopback,linklocal,uniquelocal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
       N8N_SECURE_COOKIE: "true"
       NODE_OPTIONS: "--dns-result-order=ipv4first"
+      N8N_SECURE_CODE_NODE: custom
+      N8N_CODE_NODE_JAVASCRIPT_ALLOW_BUILTIN: "*"
+      N8N_CODE_NODE_JAVASCRIPT_ALLOW_EXTERNAL: pdf-parse
+    labels:
+      - "logging_job=api"
     volumes:
       - n8n_data:/home/node/.n8n
+      - ./docs:/data
       - ./certs/prod-ca-2021.crt:/certs/prod-ca-2021.crt:ro
     networks:
       - n8n-network
@@ -49,6 +55,8 @@ services:
       - n8n
     ports:
       - "5679:5679"
+    labels:
+      - "logging_job=api"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
