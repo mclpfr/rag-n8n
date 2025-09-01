@@ -1,9 +1,493 @@
-<form
-  action="https://vmi2734167.contaboserver.net:5679/webhook-test/e2ef8a09-264c-4426-90b4-aea69cc595c1"
-  method="POST"
-  enctype="multipart/form-data"
-  target="_blank">
-  <input type="file" name="file" accept="image/png" required>
-  <button type="submit">Envoyer</button>
-</form>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Démo n8n — Soumission de note de frais</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .dropzone{border:2px dashed #d1d5db;border-radius:20px;padding:24px;text-align:center;transition:background .15s,border-color .15s}
+    .dropzone.dragover{background:#f9fafb;border-color:#60a5fa}
+    .thumb{cursor:pointer}
+    .thumb:hover{transform:scale(1.02);transition:transform .2s}
+    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;}
+  </style>
+</head>
+<body class="bg-gray-50">
+<main class="max-w-5xl mx-auto p-6 grid grid-cols-1 md:grid-cols-[280px,1fr] gap-6">
+  <!-- Colonne gauche: vignettes -->
+  <aside class="bg-white rounded-2xl shadow p-4">
+    <h2 class="font-semibold mb-3">Exemples de notes de frais</h2>
+    <p class="text-sm text-gray-600 mb-4">Veuillez cliquer ou glisser-déposer l'une des vignettes ci-dessous pour réaliser un test.</p>
+    <div class="grid grid-cols-1 gap-3">
+      <figure class="text-center">
+        <img src="/docs/demo/Marco.png" alt="Marco" class="thumb rounded-lg border" draggable="true" data-file="/docs/demo/Marco.png">
+        <figcaption class="text-xs mt-1 text-gray-600">Marco.png</figcaption>
+      </figure>
+      <figure class="text-center">
+        <img src="/docs/demo/Sophie.png" alt="Sophie" class="thumb rounded-lg border" draggable="true" data-file="/docs/demo/Sophie.png">
+        <figcaption class="text-xs mt-1 text-gray-600">Sophie.png</figcaption>
+      </figure>
+    </div>
+  </aside>
 
+  <!-- Colonne droite: formulaire -->
+  <section class="bg-white rounded-2xl shadow p-6">
+    <header class="mb-6">
+      <h1 class="text-2xl font-bold">Soumission d'une note de frais</h1>
+      <p class="text-sm text-gray-500">Veuillez glisser une vignette dans la zone ci-dessous, ou cliquer dessus pour la charger. Ensuite, cliquez sur « Envoyer ».</p>
+    </header>
+
+    <form id="demoForm" class="space-y-4" method="post" enctype="multipart/form-data" action="#">
+      <div id="drop" class="dropzone">
+        <p id="dropHint" class="text-gray-600">Déposez une vignette ici</p>
+      </div>
+      <button id="send" class="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold disabled:opacity-40" type="submit" disabled>Envoyer</button>
+    </form>
+
+    <div id="resp" class="hidden mt-6">
+      <div id="badge" class="inline-block text-xs px-2 py-1 rounded bg-gray-100"></div>
+      <p id="msg" class="text-sm text-gray-700 mt-2"></p>
+      <div class="mt-3 flex items-center gap-3">
+        <button id="toggleJson" class="text-sm underline">Afficher la réponse JSON</button>
+      </div>
+      <pre id="json" class="hidden mt-3 bg-gray-50 p-3 rounded text-xs mono"></pre>
+    </div>
+
+    <div id="err" class="hidden mt-6 text-red-600 text-sm"></div>
+  </section>
+</main>
+
+<!-- Popup modal pour les doublons -->
+<div id="duplicateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6 transform transition-all">
+    <div class="text-center">
+      <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-yellow-100 mb-4">
+        <svg class="h-8 w-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 mb-2">Note de frais déjà traitée</h3>
+      <p class="text-sm text-gray-600 mb-6">Cette note de frais a déjà été prise en compte. Aucune action supplémentaire n'est nécessaire.</p>
+      <button id="closeDuplicateModal" class="w-full bg-blue-600 text-white py-2 px-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+        OK
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Popup modal pour les succès -->
+<div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6 transform transition-all">
+    <div class="text-center">
+      <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+        <svg class="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 mb-6">Note de frais traitée</h3>
+      <button id="closeSuccessModal" class="w-full bg-green-600 text-white py-2 px-4 rounded-xl font-semibold hover:bg-green-700 transition-colors">
+        OK
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+/** ===== À CONFIGURER =====
+ * Remplacez par l'URL publique de votre Webhook n8n (POST multipart/form-data).
+ * Exemple : const WEBHOOK_URL = "https://n8n.example.com/webhook/notes-frais";
+ */
+const WEBHOOK_URL = "https://n8n.marcolopes.fr/webhook-test/379815cd-a225-4dc1-b09b-9b8be0bb6107";
+
+let selectedFile = null;
+
+// Active/désactive le bouton Envoyer et affiche le nom du fichier choisi
+function enableSend(file){
+  selectedFile = file;
+  const sendBtn = document.getElementById('send');
+  if (sendBtn) {
+    sendBtn.disabled = !file;
+    console.log('Bouton Envoyer:', file ? 'activé' : 'désactivé');
+  }
+  const hint = document.getElementById('dropHint');
+  if (hint) {
+    hint.textContent = file ? `Fichier sélectionné : ${file.name}` : "Déposez une vignette ici";
+  }
+}
+
+// Réinitialise l'interface après envoi
+function resetInterface(){
+  selectedFile = null;
+  const sendBtn = document.getElementById('send');
+  const hint = document.getElementById('dropHint');
+  const resp = document.getElementById('resp');
+  const err = document.getElementById('err');
+  
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Envoyer';
+  }
+  if (hint) {
+    hint.textContent = "Déposez une vignette ici";
+  }
+  if (resp) {
+    resp.classList.add('hidden');
+  }
+  if (err) {
+    err.classList.add('hidden');
+  }
+  
+  console.log('Interface réinitialisée');
+}
+
+// Charge une image distante et la convertit en File pour FormData
+async function loadBlobIntoFile(url){
+  console.log('Chargement de:', url);
+  try{
+    const res = await fetch(url);
+    if(!res.ok){ 
+      showError("Impossible de charger " + url); 
+      return;
+    }
+    const blob = await res.blob();
+    const file = new File([blob], url.split('/').pop(), {type: blob.type || 'image/png'});
+    console.log('Fichier créé:', file.name, file.size, 'bytes');
+    enableSend(file);
+  }catch(e){
+    console.error('Erreur loadBlobIntoFile:', e);
+    showError("Erreur lors du chargement de la vignette.");
+  }
+}
+
+// Sources (PNG) : drag & drop + clic
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM chargé, initialisation des vignettes');
+  const thumbs = document.querySelectorAll('.thumb');
+  console.log('Vignettes trouvées:', thumbs.length);
+  
+  thumbs.forEach((img, index) => {
+    console.log(`Vignette ${index}:`, img.dataset.file);
+    img.addEventListener('dragstart', e=>{
+      e.dataTransfer.setData('text/plain', img.dataset.file);
+    });
+    img.addEventListener('click', async ()=>{ 
+      console.log('Clic sur vignette:', img.dataset.file);
+      await loadBlobIntoFile(img.dataset.file); 
+    });
+  });
+});
+
+// Dropzone - Attendre que le DOM soit chargé
+document.addEventListener('DOMContentLoaded', function() {
+  const drop = document.getElementById('drop');
+  if (drop) {
+    console.log('Dropzone initialisée');
+    drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('dragover'); });
+    drop.addEventListener('dragleave', ()=> drop.classList.remove('dragover'));
+    drop.addEventListener('drop', async e=>{
+      e.preventDefault(); drop.classList.remove('dragover');
+      const url = e.dataTransfer.getData('text/plain');
+      console.log('Drop détecté:', url);
+      if(url) await loadBlobIntoFile(url);
+    });
+  }
+});
+
+// Affichage erreurs / réponses
+function showError(msg){
+  console.log('showError appelée:', msg);
+  const err = document.getElementById('err');
+  const resp = document.getElementById('resp');
+  if (err) {
+    err.textContent = msg;
+    err.classList.remove('hidden');
+  }
+  if (resp) {
+    resp.classList.add('hidden');
+  }
+  console.error('Erreur affichée:', msg);
+  
+  // Réinitialiser l'interface après 3 secondes en cas d'erreur
+  setTimeout(resetInterface, 3000);
+}
+function showResponse(data){
+  console.log('showResponse appelée avec:', data);
+  const st = (data && data.status) || 'ok';
+  console.log('Status final pour affichage:', st);
+  
+  // Si c'est un doublon, afficher le popup modal
+  if (st === 'duplicate') {
+    console.log('Affichage du modal doublon');
+    showDuplicateModal();
+    return;
+  }
+  
+  // Sinon, afficher la réponse normale
+  const resp = document.getElementById('resp');
+  const badge = document.getElementById('badge');
+  const msg = document.getElementById('msg');
+  const json = document.getElementById('json');
+
+  if (st === 'error')     { badge.textContent = 'Erreur';          badge.className="inline-block text-xs px-2 py-1 rounded bg-red-100"; }
+  else                    { badge.textContent = 'Nouveau document';badge.className="inline-block text-xs px-2 py-1 rounded bg-green-100"; }
+
+  msg.textContent = (data && data.message) ? data.message : "Traitement effectué.";
+
+  document.getElementById('toggleJson').onclick = ()=>{
+    json.classList.toggle('hidden');
+    json.textContent = JSON.stringify(data, null, 2);
+  };
+
+  resp.classList.remove('hidden');
+  document.getElementById('err').classList.add('hidden');
+}
+
+// Affiche le modal pour les doublons
+function showDuplicateModal(){
+  console.log('showDuplicateModal() appelée');
+  const modal = document.getElementById('duplicateModal');
+  if (modal) {
+    console.log('Modal trouvé, suppression de la classe hidden');
+    modal.classList.remove('hidden');
+    console.log('Classes du modal après suppression:', modal.className);
+  } else {
+    console.error('Modal duplicateModal non trouvé dans le DOM!');
+  }
+}
+
+// Ferme le modal pour les doublons
+function closeDuplicateModal(){
+  const modal = document.getElementById('duplicateModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    console.log('Modal doublon fermé');
+    // Réinitialiser l'interface après fermeture du modal
+    setTimeout(resetInterface, 500);
+  }
+  // Restaurer aussi le bouton
+  const sendBtn = document.getElementById('send');
+  if (sendBtn) {
+    sendBtn.textContent = 'Envoyer';
+    sendBtn.disabled = true;
+  }
+}
+
+// Affiche le modal pour les succès
+function showSuccessModal(){
+  console.log('showSuccessModal() appelée');
+  const modal = document.getElementById('successModal');
+  if (modal) {
+    console.log('Modal succès trouvé, suppression de la classe hidden');
+    modal.classList.remove('hidden');
+    console.log('Classes du modal après suppression:', modal.className);
+  } else {
+    console.error('Modal successModal non trouvé dans le DOM!');
+  }
+}
+
+// Ferme le modal pour les succès
+function closeSuccessModal(){
+  const modal = document.getElementById('successModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    console.log('Modal succès fermé');
+    // Réinitialiser l'interface après fermeture du modal
+    setTimeout(resetInterface, 500);
+  }
+  // Restaurer aussi le bouton
+  const sendBtn = document.getElementById('send');
+  if (sendBtn) {
+    sendBtn.textContent = 'Envoyer';
+    sendBtn.disabled = true;
+  }
+}
+
+// Envoi au Webhook n8n
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('Initialisation du formulaire');
+  const form = document.getElementById('demoForm');
+  const sendBtn = document.getElementById('send');
+  const closeModalBtn = document.getElementById('closeDuplicateModal');
+  const closeSuccessModalBtn = document.getElementById('closeSuccessModal');
+  
+  if (!form) {
+    console.error('Formulaire non trouvé!');
+    return;
+  }
+  if (!sendBtn) {
+    console.error('Bouton Envoyer non trouvé!');
+    return;
+  }
+  
+  // Event listener pour fermer le modal doublon
+  if (closeModalBtn) {
+    closeModalBtn.addEventListener('click', closeDuplicateModal);
+  }
+  
+  // Event listener pour fermer le modal succès
+  if (closeSuccessModalBtn) {
+    closeSuccessModalBtn.addEventListener('click', closeSuccessModal);
+  }
+  
+  // Fermer le modal doublon en cliquant sur l'overlay
+  const duplicateModal = document.getElementById('duplicateModal');
+  if (duplicateModal) {
+    duplicateModal.addEventListener('click', function(e) {
+      if (e.target === duplicateModal) {
+        closeDuplicateModal();
+      }
+    });
+  }
+  
+  // Fermer le modal succès en cliquant sur l'overlay
+  const successModal = document.getElementById('successModal');
+  if (successModal) {
+    successModal.addEventListener('click', function(e) {
+      if (e.target === successModal) {
+        closeSuccessModal();
+      }
+    });
+  }
+  
+  console.log('Formulaire et bouton trouvés, ajout du listener');
+  
+  form.addEventListener('submit', async function(e) {
+    console.log('Submit déclenché!');
+    e.preventDefault();
+    
+    if(!selectedFile){ 
+      console.log('Aucun fichier sélectionné');
+      return showError("Veuillez d'abord sélectionner une vignette."); 
+    }
+
+    // Afficher un indicateur de chargement
+    const originalText = sendBtn.textContent;
+    sendBtn.textContent = 'Envoi en cours...';
+    sendBtn.disabled = true;
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+    fd.append('origin', 'webhook');
+    fd.append('demo_mode', '1');
+
+    console.log('Envoi vers:', WEBHOOK_URL);
+    console.log('Fichier:', selectedFile.name, selectedFile.size, 'bytes');
+
+    try{
+      const res = await fetch(WEBHOOK_URL, { 
+        method: 'POST', 
+        body: fd,
+        mode: 'cors'
+      });
+      
+      console.log('Réponse HTTP:', res.status, res.statusText);
+      
+      console.log('Code de statut HTTP reçu:', res.status);
+      
+      // Gérer les codes d'erreur HTTP (409 = doublon)
+      if (res.status === 409) {
+        console.log('HTTP 409 détecté - doublon via code de statut');
+        showDuplicateModal();
+        return;
+      }
+      
+      // Pour les erreurs HTTP 4xx/5xx, lire quand même la réponse
+      const isError = !res.ok;
+      console.log('Réponse en erreur:', isError);
+
+      // Lire la réponse comme texte d'abord pour debug
+      const responseText = await res.text();
+      console.log('Réponse brute:', responseText);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        if (isError) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        data = {
+          status: 'ok',
+          message: 'Fichier envoyé avec succès (réponse: ' + responseText.substring(0, 100) + ')'
+        };
+      }
+
+      console.log('Données parsées:', data);
+      console.log('Status détecté:', data?.status);
+      console.log('Error détecté:', data?.error);
+      console.log('Type de error:', typeof data?.error);
+      console.log('Condition error === false:', data?.error === false);
+      console.log('Condition !data.error:', !data?.error);
+
+      // Vérifier d'abord les conditions de succès
+      console.log('Vérification des conditions de succès...');
+      console.log('data existe:', !!data);
+      console.log('data.error === false:', data?.error === false);
+      console.log('!data.error:', !data?.error);
+      console.log('data.status === success:', data?.status === 'success');
+      
+      if (data && (data.error === false || !data.error) && (data.status === 'ok' || data.status === 'success' || !data.status)) {
+        console.log('✅ Succès détecté, affichage du modal');
+        showSuccessModal();
+        return;
+      }
+
+      if (data && data.executionId && data.status === 'accepted'){
+        console.log('Succès détecté avec executionId, affichage du modal');
+        showSuccessModal();
+        return;
+      }
+      
+      // Vérifier plusieurs conditions pour détecter un doublon selon la réponse n8n
+      if (data && data.error === true) {
+        console.log('Erreur détectée via error:true');
+        console.log('Message reçu:', data.message);
+        console.log('Status reçu:', data.status);
+        
+        if (data.status === 'duplicate' || (data.message && (data.message.toLowerCase().includes('déjà') || data.message.toLowerCase().includes('duplicate') || data.message.toLowerCase().includes('précédemment')))) {
+          console.log('Doublon détecté, affichage du modal');
+          showDuplicateModal();
+          return;
+        } else {
+          console.log('Erreur détectée mais pas de doublon - affichage normal');
+        }
+      }
+      
+      console.log('❌ Conditions de succès non remplies, affichage normal');
+      showResponse(data);
+      // Réinitialiser l'interface après 3 secondes même en cas de réponse finale
+      setTimeout(resetInterface, 3000);
+
+    }catch(err){
+      console.error('Erreur fetch:', err);
+      console.log('Message d\'erreur:', err.message);
+      
+      // Si c'est une erreur HTTP 409, c'est probablement un doublon
+      if (err.message && err.message.includes('409')) {
+        console.log('Erreur 409 détectée dans le catch, affichage du modal');
+        showDuplicateModal();
+        return; // Important: sortir ici pour éviter le finally
+      } else {
+        showError("Échec d'envoi au Webhook : " + (err?.message || "erreur inconnue"));
+        // Note: resetInterface sera appelé par showError après 3 secondes
+      }
+    } finally {
+      // Toujours restaurer le bouton
+      sendBtn.textContent = originalText;
+      sendBtn.disabled = false;
+    }
+  });
+  
+  // Test direct du bouton
+  sendBtn.addEventListener('click', function(e) {
+    console.log('Clic direct sur le bouton détecté');
+    if (sendBtn.disabled) {
+      console.log('Bouton désactivé, clic ignoré');
+      e.preventDefault();
+    }
+  });
+});
+</script>
+</body>
+</html>
