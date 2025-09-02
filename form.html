@@ -19,9 +19,15 @@
     .wf-dot.err{background:#ef4444}     /* erreur */
     
     /* --- Styles tableau CSV --- */
-    #csvTable th, #csvTable td { border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; }
+    #csvTable th, #csvTable td { border: 1px solid #d1d5db; padding: 12px 16px; text-align: left; word-wrap: break-word; }
     #csvTable th { background-color: #f3f4f6; font-weight: 600; }
     #csvTable tbody tr:nth-child(even) { background-color: #f9fafb; }
+    #csvTable { width: 100%; table-layout: fixed; }
+    #csvTable th:nth-child(1), #csvTable td:nth-child(1) { width: 180px; } /* numero_note */
+    #csvTable th:nth-child(2), #csvTable td:nth-child(2) { width: 120px; } /* nom */
+    #csvTable th:nth-child(3), #csvTable td:nth-child(3) { width: 140px; white-space: nowrap; } /* date_depense */
+    #csvTable th:nth-child(4), #csvTable td:nth-child(4) { width: 200px; } /* nature */
+    #csvTable th:nth-child(5), #csvTable td:nth-child(5) { width: 100px; } /* montant */
   </style>
 </head>
 <body class="bg-gray-50">
@@ -57,11 +63,11 @@
     </form>
 
     <!-- Visuel workflow temps réel -->
-    <aside class="mt-8 p-4 bg-gray-50 rounded-xl">
-      <h3 class="font-semibold mb-3">Workflow n8n (exécution en direct)</h3>
-      <div class="relative overflow-auto">
+    <aside class="mt-8 p-6 bg-gray-50 rounded-xl">
+      <h3 class="font-semibold mb-4">Workflow n8n (exécution en direct)</h3>
+      <div class="relative overflow-auto bg-white p-4 rounded-lg border">
         <!-- Mets ici ton export PNG/SVG du workflow -->
-        <img src="/docs//assets/workflow.png" alt="Workflow n8n" class="rounded-lg max-w-full border">
+        <img src="/docs//assets/workflow.png" alt="Workflow n8n" class="rounded-lg w-full h-auto border" style="min-height: 300px; object-fit: contain;">
 
         <!-- Pastilles (positionne top/left selon ta capture) -->
         <span id="node-received"  class="wf-dot" style="top:40px;  left:60px;"></span>
@@ -76,9 +82,9 @@
     </aside>
 
     <!-- Section affichage CSV -->
-    <section class="mt-8 p-4 bg-white rounded-xl shadow-sm">
+    <section class="mt-8 p-6 bg-white rounded-xl shadow-sm">
       <h3 class="font-semibold mb-4">Données exportées</h3>
-      <div id="csvTableContainer" class="overflow-x-auto">
+      <div id="csvTableContainer" class="overflow-x-auto w-full">
         <div id="csvLoading" class="text-center text-gray-500 py-4">Chargement des données...</div>
         <table id="csvTable" class="hidden w-full border-collapse border border-gray-300 text-sm">
           <thead id="csvHeader" class="bg-gray-100"></thead>
@@ -146,7 +152,8 @@
 /** ===== À CONFIGURER =====
  * Remplace par l'URL publique de ton Webhook n8n (POST multipart/form-data).
  */
-const WEBHOOK_URL = "https://n8n.marcolopes.fr/webhook-test/379815cd-a225-4dc1-b09b-9b8be0bb6107";
+//const WEBHOOK_URL = "https://n8n.marcolopes.fr/webhook-test/379815cd-a225-4dc1-b09b-9b8be0bb6107";
+const WEBHOOK_URL = "https://n8n.marcolopes.fr/webhook/379815cd-a225-4dc1-b09b-9b8be0bb6107";
 
 /** ====== Visuel workflow : config polling ====== */
 const PROGRESS_BASE_URL = "/docs/progress"; // n8n écrit /docs/progress/<executionId>.json

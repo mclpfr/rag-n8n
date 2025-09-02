@@ -1,24 +1,24 @@
-\connect notes_frais;
+DROP TABLE IF EXISTS notes_frais CASCADE;
 
--- === Table: notes_frais ==================================================
-CREATE TABLE IF NOT EXISTS public.notes_frais
-(
-    id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    numero_facture   VARCHAR(50)  NOT NULL,
-    nom              VARCHAR(100) NOT NULL,
-    date_depense    DATE         NOT NULL,
-    nature           VARCHAR(50)  NOT NULL,
-    montant          NUMERIC(10,2) NOT NULL,
-    facture_hash     VARCHAR(64)   NOT NULL,           -- empreinte du document
-    created_at       TIMESTAMP     NOT NULL DEFAULT now()
+CREATE TABLE notes_frais (
+    id SERIAL PRIMARY KEY,
+    numero_note VARCHAR(50) NOT NULL,
+    ligne_index INT NOT NULL,              -- index de ligne à l’intérieur de la note (1..N)
+    ligne_uid TEXT,                        -- identifiant libre (non clé)
+    nom VARCHAR(255) NOT NULL,
+    date_depense DATE NOT NULL,
+    nature VARCHAR(255),
+    lieu VARCHAR(255),
+    montant NUMERIC(10,2) NOT NULL,
+    note_hash TEXT NOT NULL,               -- même valeur pour toutes les lignes d’une même note
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    -- Empêche les doublons de lignes dans une même note
+    CONSTRAINT notes_frais_unique_note_ligne UNIQUE (note_hash, ligne_index)
 );
 
--- Contrainte pour éviter doublons de factures identiques
-CREATE UNIQUE INDEX IF NOT EXISTS uq_notes_frais_doc_hash
-  ON public.notes_frais(facture_hash);
-
 -- Index utiles pour les recherches
-CREATE INDEX IF NOT EXISTS idx_notes_frais_date_depense ON public.notes_frais(date_depense);
-CREATE INDEX IF NOT EXISTS idx_notes_frais_nom          ON public.notes_frais(nom);
-CREATE INDEX IF NOT EXISTS idx_notes_frais_nature       ON public.notes_frais(nature);
+CREATE INDEX idx_notes_frais_note_hash   ON notes_frais(note_hash);
+CREATE INDEX idx_notes_frais_numero_note ON notes_frais(numero_note);
+CREATE INDEX idx_notes_frais_date        ON notes_frais(date_depense);
 
